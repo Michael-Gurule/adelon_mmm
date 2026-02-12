@@ -1,11 +1,16 @@
-# Adelon Marketing Mix Model
 
 <h1 align="center">ADELON</h1>
-<h2 align="center">Bayesian Marketing Mix Model</h2>
+<br>
+<p align="center">
+  <strong>Bayesian Marketing Mix Model</strong></p>  
+<br>
+<br>
 
 A Bayesian Marketing Mix Model built with PyMC. This model breaks revenue into the components that drive it — baseline, trend, seasonality, media spend across 5 channels, and external controls — then uses the fitted response curves to optimize budget allocation.
 
 The model runs on **synthetic data with known ground truth**. That means every parameter the model estimates can be checked against the values that actually generated the data. No guessing whether the model is right.
+<br>
+<br>
 
 <div align="center">
     <img src="https://custom-icon-badges.demolab.com/badge/Visual%20Studio%20Code-0078d7.svg?style=for-the-badge&logo=vsc&logoColor=white">
@@ -46,29 +51,15 @@ The model runs on **synthetic data with known ground truth**. That means every p
 
 ## Quick Start
 
-Clone, install, and run the pipeline. MCMC sampling takes a few minutes depending on your hardware.
+The fastest way to see the model dashboard is to pull the pre-built Docker image — no local setup required:
 
 ```bash
-# Clone and install
-git clone https://github.com/<michael-gurule>/adelon_mmm.git
-cd adelon_mmm
-pip install -e ".[bayesian,dev]"
-
-# Generate synthetic data (3 years, 5 channels)
-adelon-generate
-
-# Train the Bayesian model (MCMC — takes several minutes)
-adelon-train
-
-# Evaluate: produce metrics, contributions, ROAS, parameter recovery
-adelon-evaluate --ground-truth data/mmm_ground_truth.json
-
-# Or run the full pipeline in one command
-adelon-run
-
-# Launch the interactive dashboard
-streamlit run dashboards/app.py
+docker pull ghcr.io/<michael-gurule>/adelon_mmm:main
+docker run -p 8501:8501 ghcr.io/<michael-gurule>/adelon_mmm:main
+# Open http://localhost:8501
 ```
+
+The image includes a pre-trained model with all evaluation artifacts. The full pipeline (data generation, MCMC training, evaluation) was run at build time in CI to keep container startup instant.
 
 ### CLI Commands
 
@@ -81,17 +72,32 @@ streamlit run dashboards/app.py
 
 All commands accept `--log-level` and `--log-file`. Run any command with `--help` for the full list of options.
 
-### Docker
+### Docker (Recommended)
 
-If you'd rather not install anything locally:
+The Docker image ships with a **pre-trained model** — the full pipeline (data generation, MCMC training, evaluation) runs at build time via GitHub Actions so you don't have to. Just pull and run:
 
 ```bash
-# Launch the dashboard
-docker compose up --build
-# Dashboard at http://localhost:8501
+docker pull ghcr.io/<michael-gurule>/adelon_mmm:main
+docker run -p 8501:8501 ghcr.io/<michael-gurule>/adelon_mmm:main
+# Dashboard available immediately at http://localhost:8501
+```
 
-# Run the full pipeline in a container
-docker compose --profile pipeline run pipeline
+This approach keeps the container startup instant and avoids running MCMC sampling on your local machine.
+
+### Running the Pipeline Locally
+
+If you want to generate fresh data, retrain the model, or modify parameters, clone the repo and run the pipeline directly:
+
+```bash
+git clone https://github.com/<michael-gurule>/adelon_mmm.git
+cd adelon_mmm
+pip install -e ".[bayesian,dashboard,dev]"
+
+# Run the full pipeline: generate -> train -> evaluate
+adelon-run
+
+# Launch the dashboard
+streamlit run dashboards/app.py
 ```
 
 ## Project Structure
