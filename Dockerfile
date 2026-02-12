@@ -28,9 +28,11 @@ WORKDIR /app
 # Copy installed packages from builder
 COPY --from=builder /install /usr/local
 
-# Copy application code
+# Copy application code and data
 COPY src/ src/
 COPY dashboards/ dashboards/
+COPY config/ config/
+COPY data/ data/
 
 ENV PYTENSOR_FLAGS='device=cpu,floatx=float64,cxx=g++'
 ENV STREAMLIT_SERVER_PORT=8501
