@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adelon-mmm"
+version = "0.2.0"
+description = "Adelon — Bayesian Marketing Mix Modeling with PyMC"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0",
+    "pyyaml>=6.0.0",
+    "plotly>=5.17.0",
+    "tqdm>=4.66.0",
+]
+
+[project.optional-dependencies]
+bayesian = ["pymc>=5.20.0", "arviz>=0.20.0", "pytensor>=2.30.0", "nutpie>=0.13.0"]
+dashboard = ["streamlit>=1.28.0"]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.9.0",
+    "flake8>=6.1.0",
+    "isort>=5.12.0",
+]
+
+[project.scripts]
+adelon-generate = "src.pipeline.generate:main"
+adelon-train = "src.pipeline.train:main"
+adelon-evaluate = "src.pipeline.evaluate:main"
+adelon-run = "src.pipeline.run_all:main"
+
+[tool.setuptools.packages.find]
+include = ["src*", "data*", "config*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (MCMC sampling - deselect with '-m not slow')",
+]
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
