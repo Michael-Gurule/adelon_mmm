@@ -1,0 +1,87 @@
+# ============================================================
+# Adelon MMM — Configuration
+# ============================================================
+
+data:
+  path: "data/mmm_daily_data.csv"
+  ground_truth_path: "data/mmm_ground_truth.json"
+  contributions_path: "data/mmm_contributions_truth.csv"
+  date_col: "date"
+  revenue_col: "revenue"
+  channels:
+    - tv
+    - search
+    - social
+    - display
+    - print_ooh
+  spend_cols:
+    - tv_spend
+    - search_spend
+    - social_spend
+    - display_spend
+    - print_ooh_spend
+  control_cols:
+    - price_index
+    - is_promotion
+    - competitor_spend
+    - economic_index
+  fourier_order: 3
+
+model:
+  priors:
+    intercept:
+      mu: 50000
+      sigma: 10000
+    trend:
+      mu: 0
+      sigma: 50
+    sigma_obs:
+      sigma: 5000
+    fourier_coeffs:
+      mu: 0
+      sigma: 5000
+    dow_effects:
+      mu: 0
+      sigma: 3000
+    control_betas:
+      mu: 0
+      sigma: 10000
+    channels:
+      tv:
+        adstock_alpha: { alpha: 8.5, beta: 1.5 }
+        saturation_K: { sigma: 200000 }
+        saturation_S: { sigma: 2.0 }
+        beta_media: { sigma: 1.0 }
+      search:
+        adstock_alpha: { alpha: 2.0, beta: 8.0 }
+        saturation_K: { sigma: 50000 }
+        saturation_S: { sigma: 2.0 }
+        beta_media: { sigma: 1.0 }
+      social:
+        adstock_alpha: { alpha: 5.0, beta: 5.0 }
+        saturation_K: { sigma: 75000 }
+        saturation_S: { sigma: 2.0 }
+        beta_media: { sigma: 1.0 }
+      display:
+        adstock_alpha: { alpha: 4.0, beta: 6.0 }
+        saturation_K: { sigma: 50000 }
+        saturation_S: { sigma: 2.0 }
+        beta_media: { sigma: 1.0 }
+      print_ooh:
+        adstock_alpha: { alpha: 7.0, beta: 3.0 }
+        saturation_K: { sigma: 100000 }
+        saturation_S: { sigma: 2.0 }
+        beta_media: { sigma: 1.0 }
+
+mcmc:
+  draws: 1000
+  tune: 1000
+  chains: 4
+  target_accept: 0.95
+  random_seed: 42
+  nuts_sampler: "nutpie"
+
+artifacts:
+  traces_dir: "traces/"
+  results_filename: "mmm_trace.netcdf"
+  eval_dir: "artifacts/"

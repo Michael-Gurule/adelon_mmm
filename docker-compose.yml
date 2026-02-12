@@ -1,0 +1,22 @@
+services:
+  dashboard:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data:ro
+      - ./traces:/app/traces:ro
+    environment:
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+  pipeline:
+    build: .
+    profiles:
+      - pipeline
+    entrypoint: ["adelon-run", "--config", "config/model_config.yaml"]
+    volumes:
+      - ./data:/app/data
+      - ./traces:/app/traces
+      - ./artifacts:/app/artifacts
+    environment:
+      - PYTHONUNBUFFERED=1
