@@ -41,20 +41,20 @@ jobs:
                   tags: adelon-mmm:test
                   labels: ${{ steps.meta.outputs.labels }}
 
-            - name: Start container
+            - name: Start container and wait for pipeline + dashboard
               run: |
                   docker run -d --name mmm-test -p 8501:8501 adelon-mmm:test
-                  echo "Waiting for Streamlit to start..."
-                  for i in $(seq 1 30); do
+                  echo "Waiting for pipeline to finish and Streamlit to start..."
+                  for i in $(seq 1 90); do
                     if curl -sf http://localhost:8501/_stcore/health; then
                       echo ""
                       echo "Health check passed!"
                       exit 0
                     fi
-                    echo "Attempt $i/30 — waiting 2s..."
-                    sleep 2
+                    echo "Attempt $i/90 — waiting 10s..."
+                    sleep 10
                   done
-                  echo "Health check failed after 60s"
+                  echo "Health check failed after 15 minutes"
                   docker logs mmm-test
                   exit 1
 

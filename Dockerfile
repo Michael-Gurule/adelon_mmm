@@ -34,7 +34,7 @@ COPY dashboards/ dashboards/
 COPY config/ config/
 COPY data/ data/
 
-ENV PYTENSOR_FLAGS='device=cpu,floatx=float64,cxx=g++'
+ENV PYTENSOR_FLAGS='device=cpu,cxx=g++'
 ENV STREAMLIT_SERVER_PORT=8501
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 

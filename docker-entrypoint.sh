@@ -6,9 +6,8 @@ echo "Adelon MMM — Container Startup"
 echo "============================================================"
 
 # Run the full pipeline: generate -> train -> evaluate
-# Uses --skip-generate since synthetic data is baked into the image
-echo "Running pipeline (train + evaluate)..."
-adelon-run --skip-generate
+echo "Running full pipeline..."
+adelon-run
 
 echo "============================================================"
 echo "Pipeline complete — launching dashboard"
