@@ -43,8 +43,9 @@ RUN mkdir -p traces/ artifacts/
 
 EXPOSE 8501
 
-HEALTHCHECK --interval=30s --timeout=3s \
+COPY docker-entrypoint.sh .
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=300s \
     CMD curl --fail http://localhost:8501/_stcore/health || exit 1
 
-ENTRYPOINT ["streamlit", "run", "dashboards/app.py", \
-            "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
