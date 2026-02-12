@@ -16,7 +16,12 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from src.bayesian_mmm import BayesianMMM
-from src.optimization import estimate_revenue, greedy_budget_allocate
+from src.exceptions import OptimizationInfeasibleError
+from src.optimization import (
+    estimate_revenue,
+    greedy_budget_allocate,
+    optimize_constrained,
+)
 from src.preprocessing import (
     geometric_adstock,
     hill_saturation,
@@ -111,7 +116,6 @@ def _fmt(val: float, prefix: str = "$", decimals: int = 0) -> str:
 def main() -> None:
     """Dashboard entry point."""
     df, gt, config = load_data()
-    channels = config["data"]["channels"]
     model = load_model(config)
 
     st.sidebar.header("Navigation")
@@ -190,14 +194,15 @@ def show_overview(
     # Spend & revenue trends
     col1, col2 = st.columns([3, 1])
     with col1:
-        fig = plot_spend_revenue_trends(df)
+        fig = plot_spend_revenue_trends(df, spend_cols=spend_cols)
         st.plotly_chart(fig, use_container_width=True)
     with col2:
-        st.subheader("Daily Spend Summary")
+        st.subheader("Avg Monthly Spend")
+        monthly_spend = df.set_index("date")[spend_cols].resample("MS").sum()
         for ch in channels:
-            avg_spend = float(df[f"{ch}_spend"].mean())
-            st.write(f"**{_label(ch)}**: {_fmt(avg_spend)}/day")
-        st.write(f"**Total**: {_fmt(float(df[spend_cols].sum(axis=1).mean()))}/day")
+            avg_mo = float(monthly_spend[f"{ch}_spend"].mean())
+            st.write(f"**{_label(ch)}**: {_fmt(avg_mo)}/mo")
+        st.write(f"**Total**: {_fmt(float(monthly_spend.sum(axis=1).mean()))}/mo")
 
     # Revenue decomposition (ground truth)
     st.markdown("---")
@@ -229,7 +234,7 @@ def show_overview(
 
     with col2:
         st.subheader("Channel Spend Distribution")
-        fig = plot_channel_spend_distribution(df)
+        fig = plot_channel_spend_distribution(df, spend_cols=spend_cols)
         st.plotly_chart(fig, use_container_width=True)
 
     # Dataset info
@@ -625,10 +630,10 @@ def show_budget_optimizer(
         return
 
     st.markdown(
-        "Explore how reallocating budget across channels affects "
-        "projected revenue. The optimizer uses a greedy marginal "
-        "ROI algorithm to find the allocation that maximizes total "
-        "media revenue."
+        "Explore how reallocating budget across channels affects projected "
+        "revenue. Choose between the **Greedy Marginal ROI** algorithm or the "
+        "**Constrained Optimizer** (SciPy SLSQP) which supports per-channel "
+        "minimum and maximum spend bounds."
     )
 
     response_curves = model.get_response_curves()
@@ -646,13 +651,80 @@ def show_budget_optimizer(
         format="$%d",
     )
 
+    # Optimizer selector
+    st.subheader("Optimization Method")
+    method = st.radio(
+        "Select optimizer",
+        options=["Greedy Marginal ROI", "Constrained Optimization"],
+        horizontal=True,
+    )
+
     # Current average daily allocation
     current_alloc = {ch: float(df[f"{ch}_spend"].mean()) for ch in channels}
 
-    # Compute optimal allocation via optimization module
-    optimal_alloc = greedy_budget_allocate(
-        response_curves, budget, current_allocation=current_alloc
-    )
+    # Per-channel bounds (only shown for constrained mode)
+    min_spend: dict[str, float] = {}
+    max_spend: dict[str, float] = {}
+    if method == "Constrained Optimization":
+        st.subheader("Per-Channel Spend Bounds")
+        st.caption(
+            "Set minimum (contractual floors) and maximum (platform caps) daily "
+            "spend per channel. Defaults: min = $0, max = total budget."
+        )
+        cols = st.columns(len(channels))
+        for col, ch in zip(cols, channels):
+            with col:
+                st.markdown(f"**{_label(ch)}**")
+                ch_min = st.number_input(
+                    "Min ($)",
+                    min_value=0,
+                    max_value=int(budget),
+                    value=0,
+                    step=500,
+                    key=f"min_{ch}",
+                )
+                ch_max = st.number_input(
+                    "Max ($)",
+                    min_value=0,
+                    max_value=int(budget),
+                    value=int(budget),
+                    step=500,
+                    key=f"max_{ch}",
+                )
+                min_spend[ch] = float(ch_min)
+                max_spend[ch] = float(ch_max)
+
+    # Run the selected optimizer
+    optimal_alloc: dict[str, float] | None = None
+    greedy_alloc: dict[str, float] | None = None
+    error_msg: str | None = None
+
+    if method == "Greedy Marginal ROI":
+        greedy_alloc = greedy_budget_allocate(
+            response_curves, budget, current_allocation=current_alloc
+        )
+        optimal_alloc = greedy_alloc
+    else:
+        greedy_alloc = greedy_budget_allocate(
+            response_curves, budget, current_allocation=current_alloc
+        )
+        try:
+            optimal_alloc = optimize_constrained(
+                response_curves,
+                budget,
+                min_spend=min_spend or None,
+                max_spend=max_spend or None,
+            )
+        except OptimizationInfeasibleError as exc:
+            error_msg = str(exc)
+        except ValueError as exc:
+            error_msg = str(exc)
+
+    if error_msg:
+        st.error(f"Optimization failed: {error_msg}")
+        return
+
+    assert optimal_alloc is not None
 
     # Optimal allocation chart
     fig = plot_budget_optimizer(optimal_alloc, response_curves, budget)
@@ -668,15 +740,17 @@ def show_budget_optimizer(
         curr = current_alloc[ch]
         opt = optimal_alloc[ch]
         diff = opt - curr
-        comp_rows.append(
-            {
-                "Channel": _label(ch),
-                "Current ($)": f"{curr:,.0f}",
-                "Optimal ($)": f"{opt:,.0f}",
-                "Change ($)": f"{diff:+,.0f}",
-                "Change (%)": (f"{diff / curr * 100:+.1f}%" if curr > 0 else "N/A"),
-            }
-        )
+        row: dict[str, str] = {
+            "Channel": _label(ch),
+            "Current ($)": f"{curr:,.0f}",
+            "Optimal ($)": f"{opt:,.0f}",
+            "Change ($)": f"{diff:+,.0f}",
+            "Change (%)": (f"{diff / curr * 100:+.1f}%" if curr > 0 else "N/A"),
+        }
+        if method == "Constrained Optimization":
+            row["Min ($)"] = f"{min_spend.get(ch, 0):,.0f}"
+            row["Max ($)"] = f"{max_spend.get(ch, budget):,.0f}"
+        comp_rows.append(row)
     st.dataframe(
         pd.DataFrame(comp_rows).set_index("Channel"),
         use_container_width=True,
@@ -698,6 +772,37 @@ def show_budget_optimizer(
         st.metric("Optimal Daily Media Revenue", _fmt(optimal_rev))
     with col3:
         st.metric("Revenue Lift", _fmt(lift), f"{lift_pct:+.1f}%")
+
+    # Comparison view: show both methods side-by-side (constrained mode only)
+    if method == "Constrained Optimization" and greedy_alloc is not None:
+        st.markdown("---")
+        st.subheader("Method Comparison: Constrained vs Greedy")
+        greedy_rev = estimate_revenue(response_curves, greedy_alloc)
+        diff_rev = optimal_rev - greedy_rev
+        diff_rev_pct = diff_rev / greedy_rev * 100 if greedy_rev > 0 else 0
+
+        cmp_rows = []
+        for ch in channels:
+            cmp_rows.append(
+                {
+                    "Channel": _label(ch),
+                    "Greedy ($)": f"{greedy_alloc[ch]:,.0f}",
+                    "Constrained ($)": f"{optimal_alloc[ch]:,.0f}",
+                    "Difference ($)": f"{optimal_alloc[ch] - greedy_alloc[ch]:+,.0f}",
+                }
+            )
+        st.dataframe(
+            pd.DataFrame(cmp_rows).set_index("Channel"),
+            use_container_width=True,
+        )
+
+        col_g, col_c, col_d = st.columns(3)
+        with col_g:
+            st.metric("Greedy Revenue", _fmt(greedy_rev))
+        with col_c:
+            st.metric("Constrained Revenue", _fmt(optimal_rev))
+        with col_d:
+            st.metric("Constrained vs Greedy", _fmt(diff_rev), f"{diff_rev_pct:+.1f}%")
 
 
 # Page 6: MCMC Diagnostics

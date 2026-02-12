@@ -6,6 +6,9 @@ import logging
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
+
+from src.exceptions import OptimizationInfeasibleError
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +99,165 @@ def greedy_budget_allocate(
 
     logger.debug(
         "Budget allocated: %s",
+        {ch: f"${v:,.0f}" for ch, v in allocation.items()},
+    )
+    return allocation
+
+
+def optimize_constrained(
+    response_curves: dict[str, pd.DataFrame],
+    total_budget: float,
+    min_spend: dict[str, float] | None = None,
+    max_spend: dict[str, float] | None = None,
+    min_roas: dict[str, float] | None = None,
+) -> dict[str, float]:
+    """Allocate budget via SciPy SLSQP constrained optimization.
+
+    Maximizes total predicted media revenue subject to a total-budget
+    equality constraint plus optional per-channel lower/upper bounds
+    and per-channel minimum ROAS floors.
+
+    **Solver choice — SciPy SLSQP vs CVXPY:**
+    The Hill saturation function ``f(x) = x^S / (K^S + x^S)`` is
+    non-convex (S-shaped), so CVXPY's Disciplined Convex Programming
+    (DCP) rules reject it directly. CVXPY's non-convex backends (SCIP,
+    IPOPT) add heavy optional dependencies and platform-specific
+    compilation. SciPy SLSQP (Sequential Least Squares Programming)
+    handles non-linear objectives and constraints natively, is already
+    a core project dependency, and produces clean, maintainable code.
+    The trade-off is that SLSQP finds a *local* optimum and may miss
+    the global one; in practice, the revenue surface for typical MMM
+    response curves is quasi-concave and SLSQP converges reliably.
+
+    **Revenue model:**
+    For each channel the contribution is read from the pre-computed
+    ``response_curves`` DataFrame via linear interpolation over the
+    fitted (adstock → Hill saturation → beta) curve. This matches the
+    posterior-mean response surface used by the greedy optimizer and the
+    dashboard.
+
+    Args:
+        response_curves: Dict mapping channel name to DataFrame with
+            columns ``(spend, contribution_mean)``.
+        total_budget: Total budget to allocate (must be positive).
+        min_spend: Optional per-channel lower bounds on spend. Channels
+            not listed default to 0.
+        max_spend: Optional per-channel upper bounds on spend. Channels
+            not listed default to ``total_budget``.
+        min_roas: Optional per-channel minimum ROAS floor. For channel
+            ``ch``, enforces
+            ``contribution(x_ch) / x_ch >= min_roas[ch]``.
+
+    Returns:
+        Dict mapping channel name to allocated budget amount.
+
+    Raises:
+        ValueError: If ``total_budget`` is not positive, if
+            ``response_curves`` is empty, or if any per-channel
+            ``min_spend > max_spend``.
+        OptimizationInfeasibleError: If the problem has no feasible
+            solution (e.g., sum of minimums exceeds ``total_budget``).
+    """
+    if total_budget <= 0:
+        raise ValueError("total_budget must be positive.")
+    if not response_curves:
+        raise ValueError("response_curves must not be empty.")
+
+    channels = list(response_curves.keys())
+    n = len(channels)
+
+    # Resolve per-channel bounds
+    lo = np.array(
+        [float((min_spend or {}).get(ch, 0.0)) for ch in channels]
+    )
+    hi = np.array(
+        [float((max_spend or {}).get(ch, total_budget)) for ch in channels]
+    )
+
+    for i, ch in enumerate(channels):
+        if lo[i] < 0:
+            raise ValueError(
+                f"min_spend[{ch!r}] must be non-negative, got {lo[i]}."
+            )
+        if lo[i] > hi[i]:
+            raise ValueError(
+                f"min_spend[{ch!r}] ({lo[i]}) exceeds "
+                f"max_spend[{ch!r}] ({hi[i]})."
+            )
+
+    if lo.sum() > total_budget:
+        raise OptimizationInfeasibleError(
+            f"Sum of minimum spend bounds ({lo.sum():,.0f}) exceeds "
+            f"total_budget ({total_budget:,.0f}). Problem is infeasible."
+        )
+
+    # Pre-extract arrays for interpolation
+    spend_arrays = [rc["spend"].values for rc in response_curves.values()]
+    contrib_arrays = [rc["contribution_mean"].values for rc in response_curves.values()]
+
+    def _revenue(x: np.ndarray) -> float:
+        """Total media revenue for allocation vector x (negated for minimizer)."""
+        total = 0.0
+        for i in range(n):
+            total += np.interp(x[i], spend_arrays[i], contrib_arrays[i])
+        return -total  # negate: scipy.minimize minimizes
+
+    # Constraints
+    constraints = [
+        {
+            "type": "eq",
+            "fun": lambda x: x.sum() - total_budget,
+            "jac": lambda x: np.ones(n),
+        }
+    ]
+
+    if min_roas:
+        for i, ch in enumerate(channels):
+            floor = min_roas.get(ch)
+            if floor is None:
+                continue
+            idx = i  # capture loop variable
+
+            def _roas_con(x: np.ndarray, _i: int = idx, _f: float = floor) -> float:
+                contrib = np.interp(x[_i], spend_arrays[_i], contrib_arrays[_i])
+                if x[_i] <= 0:
+                    return 0.0  # treat zero-spend as feasible (ROAS undefined)
+                return contrib - _f * x[_i]
+
+            constraints.append({"type": "ineq", "fun": _roas_con})
+
+    # Initial point: start from lower bounds, distribute remaining budget
+    # proportionally by per-channel headroom. This guarantees x0.sum() ==
+    # total_budget and lo <= x0 <= hi without any post-hoc correction.
+    x0 = lo.copy()
+    remaining = total_budget - lo.sum()
+    headroom = hi - lo
+    total_headroom = float(headroom.sum())
+    if total_headroom > 0:
+        x0 += remaining * headroom / total_headroom
+    else:
+        # All channels pinned to their bounds; equality already satisfied.
+        pass
+
+    bounds = list(zip(lo.tolist(), hi.tolist()))
+
+    result = minimize(
+        fun=_revenue,
+        x0=x0,
+        method="SLSQP",
+        bounds=bounds,
+        constraints=constraints,
+        options={"ftol": 1e-9, "maxiter": 1000},
+    )
+
+    if not result.success:
+        raise OptimizationInfeasibleError(
+            f"SLSQP solver did not converge: {result.message}"
+        )
+
+    allocation = {ch: float(result.x[i]) for i, ch in enumerate(channels)}
+    logger.debug(
+        "Constrained allocation: %s",
         {ch: f"${v:,.0f}" for ch, v in allocation.items()},
     )
     return allocation

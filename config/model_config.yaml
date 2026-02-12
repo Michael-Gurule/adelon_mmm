@@ -1,6 +1,4 @@
-# ============================================================
 # Adelon MMM — Configuration
-# ============================================================
 
 data:
   path: "data/mmm_daily_data.csv"
@@ -85,3 +83,23 @@ artifacts:
   traces_dir: "traces/"
   results_filename: "mmm_trace.netcdf"
   eval_dir: "artifacts/"
+
+# Default bounds for the constrained budget optimizer.
+# min_spend: minimum daily spend per channel (0 = no floor).
+# max_spend: maximum daily spend per channel (null = uncapped, defaults to
+#            total_budget at runtime).
+# These are starting-point defaults; the dashboard allows overriding them.
+optimization:
+  defaults:
+    min_spend:
+      tv: 0
+      search: 0
+      social: 0
+      display: 0
+      print_ooh: 0
+    max_spend:
+      tv: null
+      search: null
+      social: null
+      display: null
+      print_ooh: null

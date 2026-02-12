@@ -40,18 +40,37 @@ def _label(channel):
 
 
 # EDA Charts
-def plot_spend_revenue_trends(df):
-    """Dual-axis time series: stacked channel spend (area) and revenue (line)."""
+def plot_spend_revenue_trends(df, spend_cols=None):
+    """Dual-axis time series: stacked monthly channel spend (area) and revenue (line).
+
+    Data is aggregated to monthly totals before plotting. Plotly's built-in
+    zoom controls allow drilling down to shorter windows after render.
+
+    Args:
+        df: MMM DataFrame with date, revenue, and spend columns.
+        spend_cols: Explicit list of owned-channel spend column names. If
+            omitted, all columns ending in ``_spend`` are used (which may
+            include control-variable columns such as ``competitor_spend``).
+    """
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    spend_cols = [c for c in df.columns if c.endswith("_spend")]
+    if spend_cols is None:
+        spend_cols = [c for c in df.columns if c.endswith("_spend")]
     channels = [c.replace("_spend", "") for c in spend_cols]
+
+    # Aggregate to monthly totals (MS = month-start anchor)
+    df_monthly = (
+        df.set_index("date")[spend_cols + ["revenue"]]
+        .resample("MS")
+        .sum()
+        .reset_index()
+    )
 
     for ch, col in zip(channels, spend_cols):
         fig.add_trace(
             go.Scatter(
-                x=df["date"],
-                y=df[col],
+                x=df_monthly["date"],
+                y=df_monthly[col],
                 name=_label(ch),
                 stackgroup="spend",
                 line=dict(width=0),
@@ -62,8 +81,8 @@ def plot_spend_revenue_trends(df):
 
     fig.add_trace(
         go.Scatter(
-            x=df["date"],
-            y=df["revenue"],
+            x=df_monthly["date"],
+            y=df_monthly["revenue"],
             name="Revenue",
             line=dict(color="black", width=2),
         ),
@@ -71,8 +90,8 @@ def plot_spend_revenue_trends(df):
     )
 
     fig.update_layout(
-        title="Daily Channel Spend & Revenue",
-        xaxis_title="Date",
+        title="Monthly Channel Spend & Revenue",
+        xaxis_title="Month",
         hovermode="x unified",
         template="plotly_white",
     )
@@ -81,9 +100,17 @@ def plot_spend_revenue_trends(df):
     return fig
 
 
-def plot_channel_spend_distribution(df):
-    """Box plots showing spend distribution per channel."""
-    spend_cols = [c for c in df.columns if c.endswith("_spend")]
+def plot_channel_spend_distribution(df, spend_cols=None):
+    """Box plots showing spend distribution per channel.
+
+    Args:
+        df: MMM DataFrame with spend columns.
+        spend_cols: Explicit list of owned-channel spend column names. If
+            omitted, all columns ending in ``_spend`` are used (which may
+            include control-variable columns such as ``competitor_spend``).
+    """
+    if spend_cols is None:
+        spend_cols = [c for c in df.columns if c.endswith("_spend")]
     channels = [c.replace("_spend", "") for c in spend_cols]
 
     fig = go.Figure()

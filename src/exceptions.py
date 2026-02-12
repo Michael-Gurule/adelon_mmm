@@ -15,3 +15,12 @@ class DataValidationError(MMMError):
 
 class ConfigurationError(MMMError):
     """Raised when configuration is invalid or missing."""
+
+
+class OptimizationInfeasibleError(MMMError):
+    """Raised when the constrained optimization problem has no feasible solution.
+
+    Common causes:
+      - Total budget is less than the sum of per-channel minimum spend bounds.
+      - Per-channel minimum spend exceeds per-channel maximum spend.
+    """

@@ -23,6 +23,7 @@ ENV/
 # Data files (generated, large)
 data/*.csv
 data/*.json
+docs/
 
 # Model artifacts
 traces/
