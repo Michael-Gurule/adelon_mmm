@@ -99,6 +99,7 @@ def main(args: argparse.Namespace | None = None) -> None:
             draws=None,
             tune=None,
             chains=None,
+            sampler=None,
             log_level=args.log_level,
             log_file=args.log_file,
         )
