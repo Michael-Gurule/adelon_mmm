@@ -10,7 +10,7 @@ env:
     IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-    build-and-push:
+    build-and-test:
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -33,7 +33,40 @@ jobs:
               with:
                   images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-            - name: Build and push Docker image
+            - name: Build Docker image (no push yet)
+              uses: docker/build-push-action@v5
+              with:
+                  context: .
+                  load: true
+                  tags: adelon-mmm:test
+                  labels: ${{ steps.meta.outputs.labels }}
+
+            - name: Start container
+              run: |
+                  docker run -d --name mmm-test -p 8501:8501 adelon-mmm:test
+                  echo "Waiting for Streamlit to start..."
+                  for i in $(seq 1 30); do
+                    if curl -sf http://localhost:8501/_stcore/health; then
+                      echo ""
+                      echo "Health check passed!"
+                      exit 0
+                    fi
+                    echo "Attempt $i/30 — waiting 2s..."
+                    sleep 2
+                  done
+                  echo "Health check failed after 60s"
+                  docker logs mmm-test
+                  exit 1
+
+            - name: Show container logs
+              if: always()
+              run: docker logs mmm-test
+
+            - name: Stop test container
+              if: always()
+              run: docker rm -f mmm-test
+
+            - name: Push Docker image
               uses: docker/build-push-action@v5
               with:
                   context: .
