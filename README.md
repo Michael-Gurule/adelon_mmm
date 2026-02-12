@@ -32,12 +32,13 @@ The model runs on **synthetic data with known ground truth**. That means every p
 
 | Metric | Value |
 |--------|-------|
-| Revenue explained (R²) | > 0.95 |
+| Revenue explained (R²) | 0.976 |
+| MAPE | 2.57% |
 | Media share of revenue | ~32% (ground truth: 32%) |
 | Highest ROAS channel | Search |
 | Longest carryover | TV (α = 0.85, ~3-week decay) |
 | Shortest carryover | Search (α = 0.20, near-immediate) |
-| MCMC convergence | R-hat < 1.01, 0 divergences |
+| MCMC convergence | R-hat < 1.005, 36 divergences (0.9%, concentrated in Print/OOH) |
 
 ## Tech Stack
 
@@ -116,7 +117,7 @@ adelon_mmm/
 │   ├── bayesian_mmm.py            # BayesianMMM class (PyMC model)
 │   ├── preprocessing.py           # Adstock, saturation, data prep
 │   ├── visualization.py           # 12 Plotly chart functions
-│   ├── optimization.py            # Budget allocation (greedy marginal ROI)
+│   ├── optimization.py            # Budget allocation: greedy marginal ROI + constrained SLSQP
 │   ├── exceptions.py              # Domain-specific exception hierarchy
 │   ├── logging_config.py          # Centralized logging setup
 │   └── pipeline/
@@ -125,11 +126,6 @@ adelon_mmm/
 │       ├── train.py               # CLI: adelon-train
 │       ├── evaluate.py            # CLI: adelon-evaluate
 │       └── run_all.py             # CLI: adelon-run (orchestrator)
-├── notebooks/
-│   ├── 01_exploratory_analysis.ipynb   # Visual EDA
-│   ├── 02_adstock_saturation.ipynb     # Transform visualization
-│   ├── 03_bayesian_mmm.ipynb           # Convergence diagnostics (loads trace)
-│   └── 04_model_validation.ipynb       # Response curves, ROAS, budget opt
 ├── dashboards/
 │   └── app.py                     # Streamlit dashboard (6 pages)
 ├── tests/
@@ -143,7 +139,9 @@ adelon_mmm/
 │   └── test_exceptions.py
 ├── artifacts/                     # Evaluation outputs (gitignored)
 ├── traces/                        # Saved MCMC traces (gitignored)
-├── .github/workflows/ci.yml       # Lint + test + MCMC test
+├── .github/workflows/
+│   ├── ci.yml                     # Lint + test + MCMC test (every push)
+│   └── docker-build.yml           # Build + push image (src/config/Dockerfile changes only)
 ├── Dockerfile                     # Multi-stage build
 ├── docker-compose.yml
 ├── pyproject.toml
@@ -191,19 +189,19 @@ f(x) = x^S / (K^S + x^S)
 
 Standard NUTS setup. The informative priors do real work here — without them, the multicollinearity between channels makes the posteriors too wide to be useful.
 
-- **Sampler**: NUTS via PyMC
-- **Chains**: 4 chains, 2,000 draws each, 1,000 tuning steps
+- **Sampler**: NUTS via PyMC (nutpie backend)
+- **Chains**: 4 chains, 1,000 draws each, 1,000 tuning steps
 - **Priors**: Beta on adstock alpha, HalfNormal on saturation and media coefficients
 - **Diagnostics**: R-hat, ESS (bulk + tail), divergences
 - **Validation**: Parameter recovery against known ground truth
 
 ## Dashboard Pages
 
-1. **Overview** — KPIs, spend/revenue trends, ground truth decomposition
+1. **Overview** — KPIs, monthly spend/revenue trends, ground truth decomposition
 2. **Channel Deep Dive** — Per-channel spend, adstock decay, saturation curves, transform pipeline
 3. **Model Results** — Parameter recovery table, revenue waterfall, model fit, residuals
 4. **Response Curves** — Marginal spend-response with 94% credible intervals
-5. **Budget Optimizer** — Greedy marginal ROI allocation with revenue lift projection
+5. **Budget Optimizer** — Greedy marginal ROI allocator and constrained SLSQP optimizer with per-channel bounds and revenue lift projection
 6. **MCMC Diagnostics** — R-hat, ESS, divergences, trace plots
 
 ## Testing
@@ -240,6 +238,9 @@ Things that would make this more useful on real data:
 - Bayesian model comparison via WAIC/LOO
 - Out-of-sample validation with rolling windows
 - Integration with ad platform APIs for live spend data
+<br>
+
+<br>
 
 <h1 align="center">LET'S CONNECT!</h1>
 
