@@ -4,7 +4,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.optimization import estimate_revenue, greedy_budget_allocate
+from src.exceptions import OptimizationInfeasibleError
+from src.optimization import (
+    estimate_revenue,
+    greedy_budget_allocate,
+    optimize_constrained,
+)
 
 
 @pytest.fixture
@@ -140,3 +145,104 @@ class TestEstimateRevenue:
         rev1 = estimate_revenue(sample_response_curves, allocation)
         rev2 = estimate_revenue(sample_response_curves, allocation)
         assert rev1 == rev2
+
+
+@pytest.fixture
+def equal_response_curves() -> dict[str, pd.DataFrame]:
+    """Response curves with identical shapes across all channels."""
+    curves = {}
+    for ch in ("tv", "search", "social"):
+        spend = np.linspace(0, 100000, 200)
+        contribution = 10000.0 * (1 - np.exp(-spend / 30000))
+        curves[ch] = pd.DataFrame(
+            {"spend": spend, "contribution_mean": contribution}
+        )
+    return curves
+
+
+class TestOptimizeConstrained:
+    def test_total_allocation_equals_budget(self, sample_response_curves):
+        """Constrained optimizer allocation must sum to total_budget."""
+        total_budget = 50000.0
+        allocation = optimize_constrained(sample_response_curves, total_budget)
+        assert sum(allocation.values()) == pytest.approx(total_budget, abs=1.0)
+
+    def test_all_channels_present(self, sample_response_curves):
+        """Every channel must appear in the allocation."""
+        allocation = optimize_constrained(sample_response_curves, 50000.0)
+        assert set(allocation.keys()) == set(sample_response_curves.keys())
+
+    def test_per_channel_min_bounds_respected(self, sample_response_curves):
+        """Allocations must be >= their per-channel minimums."""
+        min_spend = {"tv": 5000.0, "search": 3000.0, "social": 2000.0}
+        allocation = optimize_constrained(
+            sample_response_curves, 50000.0, min_spend=min_spend
+        )
+        for ch, floor in min_spend.items():
+            assert allocation[ch] >= floor - 1e-3, (
+                f"Channel {ch}: allocation {allocation[ch]:.2f} < min {floor}"
+            )
+
+    def test_per_channel_max_bounds_respected(self, sample_response_curves):
+        """Allocations must be <= their per-channel maximums."""
+        max_spend = {"tv": 20000.0, "search": 15000.0, "social": 10000.0}
+        allocation = optimize_constrained(
+            sample_response_curves, 40000.0, max_spend=max_spend
+        )
+        for ch, cap in max_spend.items():
+            assert allocation[ch] <= cap + 1e-3, (
+                f"Channel {ch}: allocation {allocation[ch]:.2f} > max {cap}"
+            )
+
+    def test_constrained_revenue_gte_greedy(self, sample_response_curves):
+        """Constrained optimizer must achieve equal or better revenue than greedy."""
+        total_budget = 50000.0
+        greedy_alloc = greedy_budget_allocate(sample_response_curves, total_budget)
+        constrained_alloc = optimize_constrained(
+            sample_response_curves, total_budget
+        )
+        greedy_rev = estimate_revenue(sample_response_curves, greedy_alloc)
+        constrained_rev = estimate_revenue(sample_response_curves, constrained_alloc)
+        # Allow a small numerical tolerance
+        assert constrained_rev >= greedy_rev - 1.0, (
+            f"Constrained revenue {constrained_rev:.2f} < greedy {greedy_rev:.2f}"
+        )
+
+    def test_equal_curves_roughly_equal_allocation(self, equal_response_curves):
+        """When all channels have identical response curves, allocation is roughly equal."""
+        total_budget = 60000.0
+        allocation = optimize_constrained(equal_response_curves, total_budget)
+        expected = total_budget / len(equal_response_curves)
+        for ch, amount in allocation.items():
+            assert amount == pytest.approx(expected, rel=0.05), (
+                f"Channel {ch}: allocation {amount:.0f} deviates from equal "
+                f"split {expected:.0f} by more than 5%"
+            )
+
+    def test_infeasible_budget_raises(self, sample_response_curves):
+        """Budget smaller than sum of minimums must raise OptimizationInfeasibleError."""
+        min_spend = {"tv": 20000.0, "search": 20000.0, "social": 20000.0}
+        with pytest.raises(OptimizationInfeasibleError):
+            optimize_constrained(
+                sample_response_curves, 50000.0, min_spend=min_spend
+            )
+
+    def test_zero_budget_raises(self, sample_response_curves):
+        """total_budget <= 0 must raise ValueError."""
+        with pytest.raises(ValueError, match="total_budget"):
+            optimize_constrained(sample_response_curves, 0.0)
+
+    def test_empty_response_curves_raises(self):
+        """Empty response_curves must raise ValueError."""
+        with pytest.raises(ValueError, match="response_curves"):
+            optimize_constrained({}, 50000.0)
+
+    def test_min_exceeds_max_raises(self, sample_response_curves):
+        """min_spend > max_spend for a channel must raise ValueError."""
+        with pytest.raises(ValueError, match="min_spend"):
+            optimize_constrained(
+                sample_response_curves,
+                50000.0,
+                min_spend={"tv": 30000.0},
+                max_spend={"tv": 10000.0},
+            )
