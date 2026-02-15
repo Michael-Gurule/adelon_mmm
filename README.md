@@ -1,6 +1,10 @@
-
-<h1 align="center">ADELON</h1>
 <br>
+
+<p align="center">
+<img width="500" alt="Adelon_logo" src="https://github.com/user-attachments/assets/eb0e4fec-610a-4493-95e4-bc9c1115db60" />
+<br>
+<br>
+  
 <p align="center">
   <strong>Bayesian Marketing Mix Model</strong></p>  
 <br>
@@ -11,6 +15,8 @@ A Bayesian Marketing Mix Model built with PyMC. This model breaks revenue into t
 The model runs on **synthetic data with known ground truth**. That means every parameter the model estimates can be checked against the values that actually generated the data. No guessing whether the model is right.
 <br>
 <br>
+<br>
+
 
 <div align="center">
     <img src="https://custom-icon-badges.demolab.com/badge/Visual%20Studio%20Code-0078d7.svg?style=for-the-badge&logo=vsc&logoColor=white">
