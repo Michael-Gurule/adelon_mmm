@@ -10,7 +10,7 @@
 <br>
 <br>
 
-**ADELON:** (from the Greek adēlon: "the non-evident") is a production-grade analytics engine designed to uncover the hidden causal relationships between marketing spend and business outcomes. Moving beyond traditional correlation-based attribution, Adelon leverages Bayesian Machine Learning and Causal Inference to provide a robust, uncertainty-aware view of marketing ROI.
+**ADELON:** (from the Greek adēlon: "the non-evident") is a production-grade analytics engine designed to uncover the hidden causal relationships between marketing spend and business outcomes. Moving beyond traditional correlation-based attribution, Adelon leverages Bayesian Machine Learning to provide a robust, uncertainty-aware view of marketing ROI.
 
 The model runs on **synthetic data with known ground truth**. That means every parameter the model estimates can be checked against the values that actually generated the data. No guessing whether the model is right.
 <br>
