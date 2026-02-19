@@ -491,6 +491,7 @@ def show_model_results(
         media_pct = total_media / total_revenue * 100
         gt_media_pct = (
             gt.get("derived", {}).get("revenue_decomposition_pct", {}).get("media", 0)
+            * 100
         )
 
         fig = go.Figure()
