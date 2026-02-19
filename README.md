@@ -44,7 +44,7 @@ The model runs on **synthetic data with known ground truth**. That means every p
 | Highest ROAS channel | Search |
 | Longest carryover | TV (α = 0.85, ~3-week decay) |
 | Shortest carryover | Search (α = 0.20, near-immediate) |
-| MCMC convergence | R-hat < 1.005, 36 divergences (0.9%, concentrated in Print/OOH) |
+| MCMC convergence | R-hat < 1.005, 24 divergences (0.6%, concentrated in Print/OOH) |
 
 ## Tech Stack
 

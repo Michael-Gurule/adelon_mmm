@@ -49,9 +49,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 # Page config
+LOGO_PATH = Path(__file__).resolve().parent / "assets" / "Adelon_Logo_Dark.png"
+
 st.set_page_config(
     page_title="Adelon MMM Dashboard",
-    page_icon="chart_with_upwards_trend",
+    page_icon=str(LOGO_PATH),
     layout="wide",
 )
 
@@ -115,6 +117,8 @@ def _fmt(val: float, prefix: str = "$", decimals: int = 0) -> str:
 
 def main() -> None:
     """Dashboard entry point."""
+    st.logo(str(LOGO_PATH))
+
     df, gt, config = load_data()
     model = load_model(config)
 
@@ -162,7 +166,7 @@ def show_overview(
     model: BayesianMMM | None,
 ) -> None:
     """Overview page with KPIs and trends."""
-    st.title("Adelon — Marketing Mix Model")
+    st.title("ADELON — Marketing Mix Model")
     st.markdown(
         "End-to-end revenue decomposition using Bayesian inference "
         "with PyMC. Synthetic data with known ground truth for "
@@ -181,13 +185,13 @@ def show_overview(
     overall_roas = total_revenue / total_spend if total_spend > 0 else 0
 
     with col1:
-        st.metric("Total Revenue (3yr)", _fmt(total_revenue))
+        st.metric("Total Revenue (3yr)", _fmt(total_revenue), border=True)
     with col2:
-        st.metric("Total Media Spend", _fmt(total_spend))
+        st.metric("Total Media Spend", _fmt(total_spend), border=True)
     with col3:
-        st.metric("Avg Daily Revenue", _fmt(avg_daily_revenue))
+        st.metric("Avg Daily Revenue", _fmt(avg_daily_revenue), border=True)
     with col4:
-        st.metric("Overall ROAS", f"{overall_roas:.2f}x")
+        st.metric("Overall ROAS", f"{overall_roas:.2f}x", border=True)
 
     st.markdown("---")
 
@@ -220,9 +224,9 @@ def show_overview(
                     marker=dict(
                         colors=[
                             "#002D40",
-                            "#C5A059",
-                            "#4F7942",
-                            "#A63446",
+                            "#d1e7ff",
+                            "#688bb3",
+                            "#305580",
                         ]
                     ),
                 )
@@ -277,13 +281,13 @@ def show_channel_deep_dive(
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Adstock Alpha", f"{params['adstock_alpha']:.2f}")
+        st.metric("Adstock Alpha", f"{params['adstock_alpha']:.2f}", border=True)
     with col2:
-        st.metric("Saturation K", _fmt(params["saturation_K"]))
+        st.metric("Saturation K", _fmt(params["saturation_K"]), border=True)
     with col3:
-        st.metric("Saturation S", f"{params['saturation_S']:.1f}")
+        st.metric("Saturation S", f"{params['saturation_S']:.1f}", border=True)
     with col4:
-        st.metric("Beta", f"{params['beta']:.4f}")
+        st.metric("Beta", f"{params['beta']:.4f}", border=True)
 
     st.markdown("---")
 
@@ -321,7 +325,9 @@ def show_channel_deep_dive(
         fig.update_layout(
             xaxis_title="Daily Spend ($)",
             yaxis_title="Count",
-            template="plotly_white",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="black"),
             height=350,
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -417,6 +423,7 @@ def show_channel_deep_dive(
                 "Base Spend": f"${p['base_daily_spend']:,.0f}",
             }
         )
+
     st.dataframe(
         pd.DataFrame(rows).set_index("Channel"),
         use_container_width=True,

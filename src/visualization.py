@@ -15,11 +15,11 @@ from src.preprocessing import geometric_adstock, hill_saturation
 ADELON_PALETTE = ["#002D40", "#C5A059", "#4F7942", "#A63446", "#1A1A1A"]
 
 CHANNEL_COLORS = {
-    "tv": "#002D40",  # Deep Aegean
-    "search": "#C5A059",  # Athenian Gold
-    "social": "#4F7942",  # Laurel Green
-    "display": "#A63446",  # Pompeian Red
-    "print_ooh": "#1A1A1A",  # Obsidian
+    "tv": "#041A33",  # Prussian Blue
+    "search": "#305580",  # Burnt Sienna
+    "social": "#1d3f66",  # Steel Blue
+    "display": "#496f99",  # Slate Gray
+    "print_ooh": "#d1e7ff",  # Adelon Gold
 }
 
 CHANNEL_LABELS = {
@@ -84,7 +84,7 @@ def plot_spend_revenue_trends(df, spend_cols=None):
             x=df_monthly["date"],
             y=df_monthly["revenue"],
             name="Revenue",
-            line=dict(color="black", width=2),
+            line=dict(color="#e0efff", width=2),
         ),
         secondary_y=True,
     )
@@ -93,7 +93,9 @@ def plot_spend_revenue_trends(df, spend_cols=None):
         title="Monthly Channel Spend & Revenue",
         xaxis_title="Month",
         hovermode="x unified",
-        template="plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#FFFFFF"),
     )
     fig.update_yaxes(title_text="Spend ($)", secondary_y=False)
     fig.update_yaxes(title_text="Revenue ($)", secondary_y=True)
@@ -231,7 +233,7 @@ def plot_contribution_waterfall(contributions, total_revenue):
             connector={"line": {"color": "rgb(63, 63, 63)"}},
             increasing={"marker": {"color": "#002D40"}},
             decreasing={"marker": {"color": "#A63446"}},
-            totals={"marker": {"color": "#C5A059"}},
+            totals={"marker": {"color": "#305580"}},
         )
     )
     fig.update_layout(
@@ -628,7 +630,7 @@ def plot_trace_diagnostics(trace, var_names, channels=None):
     n_plots = len(plots)
     fig = make_subplots(rows=n_plots, cols=1, subplot_titles=[p[0] for p in plots])
 
-    chain_colors = ["#002D40", "#C5A059", "#4F7942", "#A63446"]
+    chain_colors = ["#002D40", "#305580", "#688bb3", "#d1e7ff"]
     for row_idx, (name, data) in enumerate(plots, 1):
         n_chains = data.shape[0]
         for c in range(n_chains):
