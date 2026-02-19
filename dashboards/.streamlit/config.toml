@@ -1,0 +1,9 @@
+[theme]
+
+base="light"
+secondaryBackgroundColor="#b3cbe5"
+primaryColor="#305580"
+baseRadius="full"
+dataframeHeaderBackgroundColor="#8ba9cc"
+
+textColor="#041A33"
