@@ -1,10 +1,10 @@
 <br>
 
 <p align="center">
-<img width="500" alt="Adelon_logo" src="https://github.com/user-attachments/assets/eb0e4fec-610a-4493-95e4-bc9c1115db60" />
+<img width="340" alt="adelon_watermark_med" src="https://github.com/user-attachments/assets/b4147a64-51f0-4694-ae69-989446a86597" />
 <br>
 <br>
-  
+
 <p align="center">
   <strong>Bayesian Marketing Mix Model</strong></p>  
 <br>
